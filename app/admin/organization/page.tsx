@@ -7,6 +7,7 @@ import { Building2, Mail, Palette, Upload } from 'lucide-react'
 import api from '@/lib/api'
 import type { Organization } from '@/types/organization'
 import { useOrgStore } from '@/stores/organization'
+import { applyTheme } from '@/components/providers/OrgThemeProvider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -46,18 +47,21 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
 export default function OrganizationPage() {
   const qc = useQueryClient()
   const setOrg = useOrgStore((s) => s.setOrg)
+  const orgStore = useOrgStore((s) => s.org)
 
-  const { data: org } = useQuery<Organization>({
+  const { data: org, isLoading } = useQuery<Organization>({
     queryKey: ['organization'],
     queryFn: async () => (await api.get('/api/organization')).data,
+    placeholderData: orgStore ?? undefined,
+    refetchOnMount: 'always',
   })
 
-  const [name, setName] = useState('')
-  const [appName, setAppName] = useState('')
-  const [primaryColor, setPrimaryColor] = useState('#4f46e5')
-  const [secondaryColor, setSecondaryColor] = useState('#7c3aed')
-  const [accentColor, setAccentColor] = useState('#06b6d4')
-  const [theme, setTheme] = useState('light')
+  const [name, setName] = useState(orgStore?.name ?? '')
+  const [appName, setAppName] = useState(orgStore?.app_name ?? '')
+  const [primaryColor, setPrimaryColor] = useState(orgStore?.primary_color ?? '#4f46e5')
+  const [secondaryColor, setSecondaryColor] = useState(orgStore?.secondary_color ?? '#7c3aed')
+  const [accentColor, setAccentColor] = useState(orgStore?.accent_color ?? '#06b6d4')
+  const [theme, setTheme] = useState(orgStore?.default_theme ?? 'light')
 
   const [smtpHost, setSmtpHost] = useState('')
   const [smtpPort, setSmtpPort] = useState(587)
@@ -66,6 +70,7 @@ export default function OrganizationPage() {
   const [smtpFrom, setSmtpFrom] = useState('')
   const [smtpSsl, setSmtpSsl] = useState(true)
 
+  // Sync form when the authenticated query returns full data (includes SMTP)
   useEffect(() => {
     if (org) {
       setName(org.name)
@@ -74,6 +79,11 @@ export default function OrganizationPage() {
       setSecondaryColor(org.secondary_color)
       setAccentColor(org.accent_color)
       setTheme(org.default_theme)
+      setSmtpHost(org.smtp_host ?? '')
+      setSmtpPort(org.smtp_port ?? 587)
+      setSmtpUser(org.smtp_user ?? '')
+      setSmtpFrom(org.smtp_from ?? '')
+      setSmtpSsl(org.smtp_ssl ?? true)
     }
   }, [org])
 
@@ -89,6 +99,7 @@ export default function OrganizationPage() {
       }),
     onSuccess: ({ data }) => {
       qc.invalidateQueries({ queryKey: ['organization'] })
+      qc.invalidateQueries({ queryKey: ['org-public'] })
       setOrg(data)
       toast.success('Paramètres enregistrés')
     },
@@ -121,20 +132,47 @@ export default function OrganizationPage() {
       const { data } = await api.post('/api/organization/logo', form)
       setOrg(data)
       qc.invalidateQueries({ queryKey: ['organization'] })
+      qc.invalidateQueries({ queryKey: ['org-public'] })
       toast.success('Logo mis à jour')
     } catch {
       toast.error('Erreur lors du téléversement')
     }
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="px-6 py-4 border-b border-border/50 flex items-center gap-3 bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-[16px] font-semibold tracking-tight">Organisation</h1>
+            <p className="text-[12px] text-muted-foreground mt-0.5">Paramètres généraux et apparence de l&apos;espace de travail</p>
+          </div>
+        </div>
+        <div className="flex-1 p-6 lg:p-8 space-y-4">
+          <div className="h-8 w-48 rounded-lg bg-muted/50 animate-pulse" />
+          <div className="rounded-xl border border-border/60 bg-card p-5 space-y-4">
+            <div className="h-4 w-24 rounded bg-muted/50 animate-pulse" />
+            <div className="space-y-3">
+              <div className="h-8 rounded-lg bg-muted/50 animate-pulse" />
+              <div className="h-8 rounded-lg bg-muted/50 animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="p-8 max-w-2xl space-y-5">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div>
-        <h1 className="text-[20px] font-semibold tracking-tight">Organisation</h1>
-        <p className="text-[12px] text-muted-foreground mt-0.5">Paramètres généraux et apparence de l&apos;espace de travail</p>
+      <div className="px-6 py-4 border-b border-border/50 flex items-center gap-3 bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-[16px] font-semibold tracking-tight">Organisation</h1>
+          <p className="text-[12px] text-muted-foreground mt-0.5">Paramètres généraux et apparence de l&apos;espace de travail</p>
+        </div>
       </div>
 
+      <div className="flex-1 overflow-y-auto p-6 lg:p-8">
       <Tabs defaultValue="branding">
         <TabsList className="h-8 text-[13px] bg-muted/50 border border-border/50 p-0.5">
           <TabsTrigger value="branding" className="h-7 text-[12px] gap-1.5 px-3">
@@ -169,7 +207,7 @@ export default function OrganizationPage() {
                 <Input
                   value={appName}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAppName(e.target.value)}
-                  placeholder="SmartTask"
+                  placeholder="ProjectEyes"
                   className="h-8 text-[13px] border-border/70"
                 />
               </div>
@@ -246,7 +284,10 @@ export default function OrganizationPage() {
                   <button
                     key={t}
                     type="button"
-                    onClick={() => setTheme(t)}
+                    onClick={() => {
+                      setTheme(t)
+                      if (org) applyTheme({ ...org, default_theme: t })
+                    }}
                     className={`px-3 py-1.5 rounded-lg border text-[12px] font-medium transition-all ${
                       theme === t
                         ? 'border-primary bg-primary/10 text-primary'
@@ -360,6 +401,7 @@ export default function OrganizationPage() {
           </div>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   )
 }

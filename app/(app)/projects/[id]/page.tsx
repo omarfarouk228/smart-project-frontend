@@ -95,8 +95,8 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
   const moveTask = useMutation({
     mutationFn: ({ taskId, columnId, position }: { taskId: string; columnId: string; position: number }) =>
       api.post(`/api/projects/${projectId}/tasks/${taskId}/move`, { column_id: columnId, position }),
-    onError: () => {
-      toast.error('Erreur lors du déplacement')
+    onError: (e: any) => {
+      toast.error(e?.response?.data?.detail || 'Erreur lors du déplacement')
       qc.invalidateQueries({ queryKey: ['board', projectId] })
     },
   })
@@ -113,7 +113,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
       setAddingToColumn(null)
       setNewTaskTitle('')
     },
-    onError: () => toast.error('Erreur lors de la création'),
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Erreur lors de la création'),
   })
 
   // Group tasks by column

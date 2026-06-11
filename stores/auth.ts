@@ -5,6 +5,7 @@ import type { User } from '@/types/user'
 interface AuthState {
   user: User | null
   isAuthenticated: boolean
+  _hydrated: boolean
   setAuth: (user: User, accessToken: string, refreshToken: string) => void
   setUser: (user: User) => void
   clearAuth: () => void
@@ -16,6 +17,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       isAuthenticated: false,
+      _hydrated: false,
 
       setAuth: (user, accessToken, refreshToken) => {
         localStorage.setItem('st_access_token', accessToken)
@@ -35,15 +37,15 @@ export const useAuthStore = create<AuthState>()(
         const { user } = get()
         if (!user) return false
         if (user.is_superadmin) return true
-        return user.roles.some((r) =>
-          // permissions are resolved server-side; for client-side hints only
-          r.name === 'Administrateur'
-        )
+        return user.permissions.includes(codename)
       },
     }),
     {
-      name: 'smarttask-auth',
+      name: 'projecteyes-auth',
       partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
+      onRehydrateStorage: () => (state) => {
+        if (state) state._hydrated = true
+      },
     }
   )
 )

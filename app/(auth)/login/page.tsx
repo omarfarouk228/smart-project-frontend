@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Zap, ArrowRight } from 'lucide-react'
+import { Zap, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/organization'
 import api from '@/lib/api'
@@ -25,6 +25,13 @@ export default function LoginPage() {
   const setAuth = useAuthStore((s) => s.setAuth)
   const org = useOrgStore((s) => s.org)
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+
+  useEffect(() => {
+    api.get('/api/setup/status').then(({ data }) => {
+      if (!data.completed) router.replace('/setup')
+    }).catch(() => {})
+  }, [router])
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -46,7 +53,7 @@ export default function LoginPage() {
     }
   }
 
-  const appName = org?.app_name ?? 'SmartTask'
+  const appName = org?.app_name ?? 'ProjectEyes'
 
   return (
     <div className="min-h-screen flex">
@@ -58,7 +65,7 @@ export default function LoginPage() {
         <div className="flex items-center gap-2">
           <div
             className="flex h-7 w-7 items-center justify-center rounded-lg"
-            style={{ background: 'oklch(0.541 0.232 264.05)' }}
+            className="bg-primary"
           >
             <Zap className="h-4 w-4 text-white" />
           </div>
@@ -93,7 +100,7 @@ export default function LoginPage() {
           <div className="lg:hidden flex items-center gap-2">
             <div
               className="flex h-7 w-7 items-center justify-center rounded-lg"
-              style={{ background: 'oklch(0.541 0.232 264.05)' }}
+              className="bg-primary"
             >
               <Zap className="h-4 w-4 text-white" />
             </div>
@@ -130,13 +137,23 @@ export default function LoginPage() {
               <Label className="text-[12px] font-medium text-foreground/70">
                 Mot de passe
               </Label>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                autoComplete="current-password"
-                className="h-9 text-[13px] bg-card border-border/70 placeholder:text-muted-foreground/50 focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:border-primary/50"
-                {...register('password')}
-              />
+              <div className="relative">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  className="h-9 text-[13px] bg-card border-border/70 placeholder:text-muted-foreground/50 focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:border-primary/50 pr-9"
+                  {...register('password')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  tabIndex={-1}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {errors.password && (
                 <p className="text-[11px] text-destructive">{errors.password.message}</p>
               )}

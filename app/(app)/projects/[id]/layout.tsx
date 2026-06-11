@@ -4,7 +4,7 @@ import { use } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Kanban, List, Package, Zap, CalendarDays, GanttChartSquare } from 'lucide-react'
+import { ArrowLeft, Kanban, List, Package, Zap, CalendarDays, GanttChartSquare, Settings, BarChart2, ClipboardList } from 'lucide-react'
 import api from '@/lib/api'
 import type { Project } from '@/types/project'
 import { buttonVariants } from '@/components/ui/button'
@@ -25,6 +25,8 @@ export default function ProjectLayout({
     queryFn: async () => (await api.get(`/api/projects/${id}`)).data,
   })
 
+  const isOwner = project?.my_role === 'owner'
+
   const tabs = [
     { href: `/projects/${id}`, label: 'Board', icon: Kanban, exact: true },
     { href: `/projects/${id}/list`, label: 'Liste', icon: List },
@@ -32,6 +34,9 @@ export default function ProjectLayout({
     { href: `/projects/${id}/sprints`, label: 'Sprints', icon: Zap },
     { href: `/projects/${id}/calendar`, label: 'Calendrier', icon: CalendarDays },
     { href: `/projects/${id}/roadmap`, label: 'Roadmap', icon: GanttChartSquare },
+    { href: `/projects/${id}/analytics`, label: 'Analytique', icon: BarChart2 },
+    { href: `/projects/${id}/audit`, label: 'Activité', icon: ClipboardList },
+    ...(isOwner ? [{ href: `/projects/${id}/settings`, label: 'Paramètres', icon: Settings }] : []),
   ]
 
   const isActive = (href: string, exact?: boolean) =>

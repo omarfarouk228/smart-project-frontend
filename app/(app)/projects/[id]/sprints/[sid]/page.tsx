@@ -66,7 +66,7 @@ export default function SprintBoardPage({ params }: { params: Promise<{ id: stri
   const moveTask = useMutation({
     mutationFn: ({ taskId, columnId, position }: { taskId: string; columnId: string; position: number }) =>
       api.post(`/api/projects/${projectId}/tasks/${taskId}/move`, { column_id: columnId, position }),
-    onError: () => { toast.error('Erreur lors du déplacement'); qc.invalidateQueries({ queryKey: ['sprint-board', projectId, sprintId] }) },
+    onError: (e: any) => { toast.error(e?.response?.data?.detail || 'Erreur lors du déplacement'); qc.invalidateQueries({ queryKey: ['sprint-board', projectId, sprintId] }) },
   })
 
   const createTask = useMutation({
@@ -78,7 +78,7 @@ export default function SprintBoardPage({ params }: { params: Promise<{ id: stri
       setAddingToColumn(null)
       setNewTaskTitle('')
     },
-    onError: () => toast.error('Erreur'),
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Erreur'),
   })
 
   const tasksByColumn = useMemo(() => {

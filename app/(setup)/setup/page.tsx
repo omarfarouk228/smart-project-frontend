@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Check, Zap } from 'lucide-react'
+import { Check, Zap, Eye, EyeOff } from 'lucide-react'
 import api from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -49,13 +50,15 @@ const PRESETS = [
 
 export default function SetupPage() {
   const router = useRouter()
+  const qc = useQueryClient()
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(schema) as any,
     defaultValues: {
-      app_name: 'SmartTask',
+      app_name: 'ProjectEyes',
       primary_color: '#4f46e5',
       secondary_color: '#7c3aed',
       accent_color: '#06b6d4',
@@ -97,7 +100,8 @@ export default function SetupPage() {
         }
       }
       await api.post('/api/setup', payload)
-      toast.success('SmartTask est prêt !')
+      qc.invalidateQueries({ queryKey: ['org-public'] })
+      toast.success('ProjectEyes est prêt !')
       router.replace('/login')
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || 'Erreur lors de la configuration')
@@ -107,20 +111,20 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="h-screen bg-background flex overflow-hidden">
       {/* Left — steps */}
       <div
-        className="hidden lg:flex w-[260px] shrink-0 flex-col py-12 px-6"
+        className="hidden lg:flex w-[260px] shrink-0 flex-col py-12 px-6 overflow-y-auto"
         style={{ background: 'oklch(0.108 0.012 264)' }}
       >
         <div className="flex items-center gap-2 mb-10">
           <div
             className="flex h-7 w-7 items-center justify-center rounded-lg"
-            style={{ background: 'oklch(0.541 0.232 264.05)' }}
+            className="bg-primary"
           >
             <Zap className="h-4 w-4 text-white" />
           </div>
-          <span className="text-white font-semibold text-[14px] tracking-tight">SmartTask</span>
+          <span className="text-white font-semibold text-[14px] tracking-tight">ProjectEyes</span>
         </div>
 
         <div className="space-y-1">
@@ -157,8 +161,8 @@ export default function SetupPage() {
       </div>
 
       {/* Right — form */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-[460px]">
+      <div className="flex-1 overflow-y-auto flex justify-center p-8">
+        <div className="w-full max-w-[460px] py-8">
           {/* Mobile step indicator */}
           <div className="lg:hidden flex items-center gap-1.5 mb-6">
             {STEPS.map((s, i) => (
@@ -180,7 +184,7 @@ export default function SetupPage() {
             <p className="text-[13px] text-muted-foreground mt-0.5">{STEPS[step].description}</p>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)}>
+          <form onSubmit={(e) => e.preventDefault()}>
             <div className="space-y-4">
               {step === 0 && (
                 <>
@@ -196,7 +200,7 @@ export default function SetupPage() {
                   <div className="space-y-1.5">
                     <Label className="text-[12px] font-medium text-foreground/70">Nom de l&apos;application</Label>
                     <Input
-                      placeholder="SmartTask"
+                      placeholder="ProjectEyes"
                       className="h-9 text-[13px] bg-card border-border/70"
                       {...register('app_name')}
                     />
@@ -210,23 +214,38 @@ export default function SetupPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-[12px] font-medium text-foreground/70">Prénom *</Label>
-                      <Input className="h-9 text-[13px] bg-card border-border/70" {...register('admin_first_name')} />
+                      <Input placeholder="Jean" className="h-9 text-[13px] bg-card border-border/70" {...register('admin_first_name')} />
                       {errors.admin_first_name && <p className="text-[11px] text-destructive">{(errors.admin_first_name as any).message}</p>}
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-[12px] font-medium text-foreground/70">Nom *</Label>
-                      <Input className="h-9 text-[13px] bg-card border-border/70" {...register('admin_last_name')} />
+                      <Input placeholder="Dupont" className="h-9 text-[13px] bg-card border-border/70" {...register('admin_last_name')} />
                       {errors.admin_last_name && <p className="text-[11px] text-destructive">{(errors.admin_last_name as any).message}</p>}
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-[12px] font-medium text-foreground/70">Email *</Label>
-                    <Input type="email" className="h-9 text-[13px] bg-card border-border/70" {...register('admin_email')} />
+                    <Input type="email" placeholder="admin@acme.com" className="h-9 text-[13px] bg-card border-border/70" {...register('admin_email')} />
                     {errors.admin_email && <p className="text-[11px] text-destructive">{(errors.admin_email as any).message}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-[12px] font-medium text-foreground/70">Mot de passe *</Label>
-                    <Input type="password" placeholder="Minimum 8 caractères" className="h-9 text-[13px] bg-card border-border/70" {...register('admin_password')} />
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Minimum 8 caractères"
+                        className="h-9 text-[13px] bg-card border-border/70 pr-9"
+                        {...register('admin_password')}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                     {errors.admin_password && <p className="text-[11px] text-destructive">{(errors.admin_password as any).message}</p>}
                   </div>
                 </>
@@ -336,11 +355,11 @@ export default function SetupPage() {
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-[12px] font-medium text-foreground/70">Utilisateur</Label>
-                      <Input type="email" className="h-9 text-[13px] bg-card border-border/70" {...register('smtp_user')} />
+                      <Input type="email" placeholder="votre@email.com" className="h-9 text-[13px] bg-card border-border/70" {...register('smtp_user')} />
                     </div>
                     <div className="space-y-1.5 col-span-2">
                       <Label className="text-[12px] font-medium text-foreground/70">Mot de passe</Label>
-                      <Input type="password" className="h-9 text-[13px] bg-card border-border/70" {...register('smtp_password')} />
+                      <Input type="password" placeholder="••••••••••••" className="h-9 text-[13px] bg-card border-border/70" {...register('smtp_password')} />
                     </div>
                     <div className="space-y-1.5 col-span-2">
                       <Label className="text-[12px] font-medium text-foreground/70">Email expéditeur</Label>
@@ -352,32 +371,32 @@ export default function SetupPage() {
             </div>
 
             <div className="flex items-center justify-between mt-8 pt-6 border-t border-border/50">
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                className="text-[13px] text-muted-foreground"
                 onClick={() => setStep((s) => s - 1)}
                 disabled={step === 0}
+                className="text-[13px] text-muted-foreground px-3 py-1.5 rounded-lg hover:bg-muted/60 transition-colors disabled:opacity-40 disabled:pointer-events-none"
               >
                 Précédent
-              </Button>
+              </button>
 
               {step < STEPS.length - 1 ? (
-                <Button
+                <button
                   type="button"
-                  className="text-[13px] font-medium px-6"
                   onClick={() => setStep((s) => s + 1)}
+                  className="text-[13px] font-medium px-6 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/80 transition-colors"
                 >
                   Continuer
-                </Button>
+                </button>
               ) : (
-                <Button
-                  type="submit"
+                <button
+                  type="button"
                   disabled={loading}
-                  className="text-[13px] font-medium px-6"
+                  onClick={() => handleSubmit(onSubmit)()}
+                  className="text-[13px] font-medium px-6 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/80 transition-colors disabled:opacity-50 disabled:pointer-events-none"
                 >
                   {loading ? 'Configuration…' : 'Terminer la configuration'}
-                </Button>
+                </button>
               )}
             </div>
           </form>

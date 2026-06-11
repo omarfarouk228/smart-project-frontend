@@ -4,14 +4,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
-  Trash2, Plus, Check, Send, Pencil, X, Clock, Timer,
+  Trash2, Plus, Check, Send, Pencil, X, Clock, Timer, Paperclip, Tag, Download, ChevronRight,
 } from 'lucide-react'
 import api from '@/lib/api'
-import type { Task, TaskDetail, Priority, SubTask, Comment, TimeEntry } from '@/types/task'
-import type { ProjectMember } from '@/types/project'
+import type { Task, TaskDetail, Priority, SubTask, Comment, TimeEntry, Label, Attachment } from '@/types/task'
+import type { ProjectMember, Column, Project } from '@/types/project'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 const PRIORITIES: { value: Priority; label: string; color: string }[] = [
@@ -94,7 +93,7 @@ function SubTaskItem({ subtask, projectId, taskId }: { subtask: SubTask; project
     },
   })
   return (
-    <div className="flex items-center gap-2 group py-1">
+    <div className="flex items-center gap-2.5 group py-1.5 px-2 rounded-lg hover:bg-muted/40 transition-colors">
       <button
         onClick={() => toggle.mutate()}
         className={cn(
@@ -125,7 +124,7 @@ function TimeEntryItem({
     mutationFn: () =>
       api.delete(`/api/projects/${projectId}/tasks/${taskId}/time-entries/${entry.id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['task-detail', taskId] }),
-    onError: () => toast.error('Accès refusé'),
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Accès refusé'),
   })
   return (
     <div className="flex items-center gap-2 group py-0.5">
@@ -166,7 +165,7 @@ function CommentItem({
     mutationFn: () =>
       api.patch(`/api/projects/${projectId}/tasks/${taskId}/comments/${comment.id}`, { content }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['task-detail', taskId] }); setEditing(false) },
-    onError: () => toast.error('Erreur'),
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Erreur'),
   })
   const remove = useMutation({
     mutationFn: () =>
@@ -175,11 +174,11 @@ function CommentItem({
       qc.invalidateQueries({ queryKey: ['task-detail', taskId] })
       qc.invalidateQueries({ queryKey: ['board', projectId] })
     },
-    onError: () => toast.error('Erreur'),
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Erreur'),
   })
 
   return (
-    <div className="flex gap-2.5 group">
+    <div className="flex gap-3 group">
       <Avatar name={comment.user.full_name} size="sm" />
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2">
@@ -187,23 +186,17 @@ function CommentItem({
           <span className="text-[11px] text-muted-foreground/50">{timeAgo(comment.created_at)}</span>
           {comment.user.id === currentUserId && (
             <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={() => setEditing(true)}
-                className="text-muted-foreground/50 hover:text-foreground transition-colors"
-              >
+              <button onClick={() => setEditing(true)} className="text-muted-foreground/50 hover:text-foreground transition-colors">
                 <Pencil className="h-3 w-3" />
               </button>
-              <button
-                onClick={() => remove.mutate()}
-                className="text-muted-foreground/50 hover:text-destructive transition-colors"
-              >
+              <button onClick={() => remove.mutate()} className="text-muted-foreground/50 hover:text-destructive transition-colors">
                 <Trash2 className="h-3 w-3" />
               </button>
             </div>
           )}
         </div>
         {editing ? (
-          <div className="mt-1 space-y-1.5">
+          <div className="mt-1.5 space-y-1.5">
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -214,20 +207,63 @@ function CommentItem({
               <Button size="sm" className="h-6 text-[11px]" onClick={() => update.mutate()} disabled={update.isPending}>
                 Enregistrer
               </Button>
-              <Button
-                size="sm" variant="ghost" className="h-6 text-[11px]"
-                onClick={() => { setEditing(false); setContent(comment.content) }}
-              >
+              <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => { setEditing(false); setContent(comment.content) }}>
                 Annuler
               </Button>
             </div>
           </div>
         ) : (
-          <p className="text-[13px] text-foreground/90 mt-0.5 whitespace-pre-wrap">
+          <p className="text-[13px] text-foreground/90 mt-0.5 whitespace-pre-wrap leading-relaxed">
             {renderWithMentions(comment.content, members)}
           </p>
         )}
       </div>
+    </div>
+  )
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} o`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
+}
+
+function AttachmentRow({
+  attachment, currentUserId, onDelete,
+}: { attachment: Attachment; currentUserId: string; onDelete: () => void }) {
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  const downloadUrl = `${apiBase}/storage/${attachment.file_path}`
+  const isImage = attachment.mime_type.startsWith('image/')
+
+  return (
+    <div className="flex items-center gap-2.5 group py-1.5 px-2 rounded-lg hover:bg-muted/40 transition-colors">
+      <div className="h-8 w-8 rounded-lg border border-border/50 bg-muted/30 flex items-center justify-center shrink-0 overflow-hidden">
+        {isImage ? (
+          <img src={downloadUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <Paperclip className="h-3.5 w-3.5 text-muted-foreground/50" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[12px] font-medium truncate">{attachment.filename}</p>
+        <p className="text-[10px] text-muted-foreground/50">{formatFileSize(attachment.file_size)}</p>
+      </div>
+      <a
+        href={downloadUrl}
+        download={attachment.filename}
+        className="h-6 w-6 flex items-center justify-center text-muted-foreground/30 hover:text-muted-foreground transition-colors rounded-md hover:bg-muted"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Download className="h-3.5 w-3.5" />
+      </a>
+      {attachment.uploader.id === currentUserId && (
+        <button
+          onClick={onDelete}
+          className="h-6 w-6 flex items-center justify-center text-transparent group-hover:text-muted-foreground/30 hover:!text-destructive transition-all rounded-md hover:bg-muted"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   )
 }
@@ -246,6 +282,8 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<Priority>('medium')
   const [assigneeId, setAssigneeId] = useState<string>('')
+  const [columnId, setColumnId] = useState<string>('')
+  const [startDate, setStartDate] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [estimatedHours, setEstimatedHours] = useState('')
   const [newSubtask, setNewSubtask] = useState('')
@@ -254,6 +292,7 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
   const [logHours, setLogHours] = useState('')
   const [logNote, setLogNote] = useState('')
   const commentRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionStart, setMentionStart] = useState(-1)
   const [showMention, setShowMention] = useState(false)
@@ -269,12 +308,31 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
       setDescription(task.description ?? '')
       setPriority(task.priority)
       setAssigneeId(task.assignee?.id ?? '')
+      setColumnId(task.column_id ?? '')
+      setStartDate(task.start_date ?? '')
       setDueDate(task.due_date ?? '')
       setEstimatedHours(
         task.estimated_minutes ? (task.estimated_minutes / 60).toString() : ''
       )
     }
   }, [task])
+
+  // Lock body scroll when open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [open])
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    if (open) window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [open, onClose])
 
   const { data: detail } = useQuery<TaskDetail>({
     queryKey: ['task-detail', task?.id],
@@ -288,6 +346,33 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
     enabled: open,
   })
 
+  const { data: projectLabels = [] } = useQuery<Label[]>({
+    queryKey: ['project-labels', projectId],
+    queryFn: async () => (await api.get(`/api/projects/${projectId}/labels`)).data,
+    enabled: open,
+  })
+
+  const { data: projectColumns = [] } = useQuery<Column[]>({
+    queryKey: ['project-columns', projectId],
+    queryFn: async () => {
+      const res = await api.get<Project>(`/api/projects/${projectId}`)
+      return res.data.columns.slice().sort((a, b) => a.position - b.position)
+    },
+    enabled: open,
+  })
+
+  const moveColumn = useMutation({
+    mutationFn: (newColumnId: string) =>
+      api.post(`/api/projects/${projectId}/tasks/${task!.id}/move`, { column_id: newColumnId, position: 0 }),
+    onSuccess: (_, newColumnId) => {
+      setColumnId(newColumnId)
+      qc.invalidateQueries({ queryKey: ['board', projectId] })
+      qc.invalidateQueries({ queryKey: ['my-tasks'] })
+      qc.invalidateQueries({ queryKey: ['task-detail', task!.id] })
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Erreur'),
+  })
+
   const update = useMutation({
     mutationFn: () =>
       api.patch(`/api/projects/${projectId}/tasks/${task!.id}`, {
@@ -295,6 +380,7 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
         description: description || null,
         priority,
         assignee_id: assigneeId || null,
+        start_date: startDate || null,
         due_date: dueDate || null,
         estimated_minutes: hoursToMinutes(estimatedHours),
       }),
@@ -304,7 +390,7 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
       toast.success('Tâche mise à jour')
       onClose()
     },
-    onError: () => toast.error('Erreur'),
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Erreur'),
   })
 
   const remove = useMutation({
@@ -324,7 +410,7 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
       qc.invalidateQueries({ queryKey: ['board', projectId] })
       setNewSubtask('')
     },
-    onError: () => toast.error('Erreur'),
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Erreur'),
   })
 
   const addComment = useMutation({
@@ -335,7 +421,7 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
       qc.invalidateQueries({ queryKey: ['board', projectId] })
       setNewComment('')
     },
-    onError: () => toast.error('Erreur'),
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Erreur'),
   })
 
   const addTimeEntry = useMutation({
@@ -351,8 +437,48 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
       setShowLogTime(false)
       toast.success('Temps enregistré')
     },
-    onError: () => toast.error('Erreur'),
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Erreur'),
   })
+
+  const toggleLabel = useMutation({
+    mutationFn: ({ labelId, has }: { labelId: string; has: boolean }) =>
+      has
+        ? api.delete(`/api/projects/${projectId}/tasks/${task!.id}/labels/${labelId}`)
+        : api.post(`/api/projects/${projectId}/tasks/${task!.id}/labels/${labelId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['board', projectId] })
+      qc.invalidateQueries({ queryKey: ['task-detail', task!.id] })
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Erreur'),
+  })
+
+  const uploadAttachment = useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      return api.post(`/api/projects/${projectId}/tasks/${task!.id}/attachments`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['task-detail', task!.id] })
+      toast.success('Fichier joint')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Erreur lors du téléchargement'),
+  })
+
+  const deleteAttachment = useMutation({
+    mutationFn: (attachmentId: string) =>
+      api.delete(`/api/projects/${projectId}/tasks/${task!.id}/attachments/${attachmentId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['task-detail', task!.id] }),
+    onError: (e: any) => toast.error(e?.response?.data?.detail || 'Accès refusé'),
+  })
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) uploadAttachment.mutate(file)
+    e.target.value = ''
+  }
 
   const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value
@@ -394,31 +520,116 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
   const totalCount = detail?.subtasks?.length ?? 0
   const progress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
   const loggedMin = detail?.time_entries?.reduce((acc, e) => acc + e.minutes, 0) ?? 0
+  const priorityInfo = PRIORITIES.find((p) => p.value === priority)
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden max-h-[90vh]">
-        <div className="flex h-full max-h-[90vh]">
+    <>
+      {/* Backdrop */}
+      <div
+        className={cn(
+          'fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-300',
+          open ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        )}
+        onClick={onClose}
+      />
 
-          {/* ── Left ───────────────────────────────────────────────────── */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 border-r border-border/50">
+      {/* Slide-in panel */}
+      <div
+        className={cn(
+          'fixed top-0 right-0 z-50 h-screen w-[900px] max-w-[95vw] bg-background shadow-2xl',
+          'flex flex-col transition-transform duration-300 ease-in-out',
+          open ? 'translate-x-0' : 'translate-x-full'
+        )}
+      >
+        {/* Panel header */}
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-border/50 bg-background/95 backdrop-blur-sm shrink-0">
+          <button
+            onClick={onClose}
+            className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-all shrink-0"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span
+              className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded shrink-0"
+              style={{ background: `${priorityInfo?.color}18`, color: priorityInfo?.color }}
+            >
+              {priorityInfo?.label.toUpperCase()}
+            </span>
+            <span className="text-[13px] text-muted-foreground truncate">
+              {new Date(task.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => remove.mutate()}
+              className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+            <Button
+              onClick={() => update.mutate()}
+              disabled={update.isPending}
+              className="h-7 text-[12px] px-4"
+            >
+              {update.isPending ? 'Enregistrement…' : 'Enregistrer'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Panel body — two columns */}
+        <div className="flex flex-1 overflow-hidden">
+
+          {/* ── Left — main content ─────────────────────────────────── */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-7">
+
+            {/* Title */}
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full text-[17px] font-semibold bg-transparent border-0 outline-none placeholder:text-muted-foreground/40"
+              className="w-full text-[20px] font-semibold bg-transparent border-0 outline-none placeholder:text-muted-foreground/30 leading-tight"
               placeholder="Titre de la tâche"
             />
 
-            <div className="space-y-1.5">
+            {/* Description */}
+            <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Description</p>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Ajouter une description…"
                 rows={4}
-                className="w-full rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-[13px] placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-1 focus:ring-primary/30"
+                className="w-full rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-[13px] placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-1 focus:ring-primary/30 leading-relaxed"
               />
             </div>
+
+            {/* Labels */}
+            {projectLabels.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Tag className="h-3 w-3" />
+                  Étiquettes
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {projectLabels.map((label) => {
+                    const has = (detail?.labels ?? task.labels).some((l) => l.id === label.id)
+                    return (
+                      <button
+                        key={label.id}
+                        onClick={() => toggleLabel.mutate({ labelId: label.id, has })}
+                        className={cn(
+                          'text-[11px] font-medium px-2.5 py-1 rounded-full border transition-all',
+                          has ? 'text-white border-transparent' : 'border-border/60 text-muted-foreground hover:border-border bg-background'
+                        )}
+                        style={has ? { background: label.color, borderColor: label.color } : {}}
+                      >
+                        {label.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Subtasks */}
             <div className="space-y-2">
@@ -426,33 +637,66 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
                 Sous-tâches {totalCount > 0 && `(${doneCount}/${totalCount})`}
               </p>
               {totalCount > 0 && (
-                <div className="h-1 rounded-full bg-muted overflow-hidden">
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                   <div className="h-full bg-primary transition-all rounded-full" style={{ width: `${progress}%` }} />
                 </div>
               )}
-              <div className="space-y-0.5">
+              <div className="rounded-xl border border-border/50 bg-card overflow-hidden">
                 {detail?.subtasks?.map((s) => (
-                  <SubTaskItem key={s.id} subtask={s} projectId={projectId} taskId={task.id} />
+                  <div key={s.id} className="border-b border-border/30 last:border-b-0">
+                    <SubTaskItem subtask={s} projectId={projectId} taskId={task.id} />
+                  </div>
                 ))}
+                <div className="flex gap-2 p-2">
+                  <Input
+                    value={newSubtask}
+                    onChange={(e) => setNewSubtask(e.target.value)}
+                    placeholder="Ajouter une sous-tâche…"
+                    className="h-8 text-[12px] border-border/50 bg-transparent"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newSubtask.trim()) addSubtask.mutate()
+                    }}
+                  />
+                  <Button
+                    size="sm" variant="outline" className="h-8 w-8 p-0 shrink-0"
+                    disabled={!newSubtask.trim() || addSubtask.isPending}
+                    onClick={() => addSubtask.mutate()}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Input
-                  value={newSubtask}
-                  onChange={(e) => setNewSubtask(e.target.value)}
-                  placeholder="Ajouter une sous-tâche…"
-                  className="h-7 text-[12px] border-border/60"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newSubtask.trim()) addSubtask.mutate()
-                  }}
-                />
-                <Button
-                  size="sm" variant="outline" className="h-7 w-7 p-0 shrink-0"
-                  disabled={!newSubtask.trim() || addSubtask.isPending}
-                  onClick={() => addSubtask.mutate()}
+            </div>
+
+            {/* Attachments */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Paperclip className="h-3 w-3" />
+                  Pièces jointes {detail?.attachments?.length ? `(${detail.attachments.length})` : ''}
+                </p>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground flex items-center gap-1 transition-colors"
                 >
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
+                  <Plus className="h-3 w-3" />
+                  Joindre un fichier
+                </button>
+                <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} />
               </div>
+              {detail?.attachments && detail.attachments.length > 0 && (
+                <div className="rounded-xl border border-border/50 bg-card overflow-hidden">
+                  {detail.attachments.map((att) => (
+                    <div key={att.id} className="border-b border-border/30 last:border-b-0">
+                      <AttachmentRow
+                        attachment={att}
+                        currentUserId={currentUser?.id ?? ''}
+                        onDelete={() => deleteAttachment.mutate(att.id)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Comments */}
@@ -460,28 +704,31 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Commentaires {detail?.comments?.length ? `(${detail.comments.length})` : ''}
               </p>
-              <div className="space-y-4">
-                {detail?.comments?.map((c) => (
-                  <CommentItem
-                    key={c.id}
-                    comment={c}
-                    currentUserId={currentUser?.id ?? ''}
-                    projectId={projectId}
-                    taskId={task.id}
-                    members={members}
-                  />
-                ))}
-              </div>
 
-              <div className="flex gap-2 pt-1">
+              {detail?.comments && detail.comments.length > 0 && (
+                <div className="space-y-5 mb-4">
+                  {detail.comments.map((c) => (
+                    <CommentItem
+                      key={c.id}
+                      comment={c}
+                      currentUserId={currentUser?.id ?? ''}
+                      projectId={projectId}
+                      taskId={task.id}
+                      members={members}
+                    />
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-3">
                 <div className="flex-1 relative">
                   <textarea
                     ref={commentRef}
                     value={newComment}
                     onChange={handleCommentChange}
                     placeholder="Écrire un commentaire… (@mention)"
-                    rows={2}
-                    className="w-full rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-[13px] placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-1 focus:ring-primary/30"
+                    rows={3}
+                    className="w-full rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-[13px] placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:ring-1 focus:ring-primary/30 leading-relaxed"
                     onKeyDown={(e) => {
                       if (e.key === 'Escape') { setShowMention(false); return }
                       if (e.key === 'Enter' && !e.shiftKey && !showMention && newComment.trim()) {
@@ -491,12 +738,12 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
                     }}
                   />
                   {showMention && filteredMembers.length > 0 && (
-                    <div className="absolute bottom-full mb-1 left-0 w-56 rounded-lg border border-border bg-popover shadow-lg z-50 overflow-hidden">
+                    <div className="absolute bottom-full mb-1 left-0 w-56 rounded-xl border border-border bg-popover shadow-lg z-50 overflow-hidden">
                       {filteredMembers.map((m) => (
                         <button
                           key={m.user.id}
                           onMouseDown={(e) => { e.preventDefault(); insertMention(m) }}
-                          className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-muted transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted transition-colors"
                         >
                           <Avatar name={m.user.full_name} size="xs" />
                           <span className="text-[12px]">{m.user.full_name}</span>
@@ -516,25 +763,25 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
             </div>
           </div>
 
-          {/* ── Right — metadata ──────────────────────────────────────── */}
-          <div className="w-56 shrink-0 p-4 space-y-5 overflow-y-auto">
+          {/* ── Right — metadata sidebar ─────────────────────────────── */}
+          <div className="w-64 shrink-0 border-l border-border/50 overflow-y-auto p-5 space-y-6 bg-muted/10">
 
             {/* Priority */}
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Priorité</p>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {PRIORITIES.map((p) => (
                   <button
                     key={p.value}
                     onClick={() => setPriority(p.value)}
                     className={cn(
-                      'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[12px] font-medium transition-all',
+                      'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium transition-all',
                       priority === p.value ? 'text-white' : 'text-muted-foreground hover:bg-muted'
                     )}
                     style={priority === p.value ? { background: p.color } : {}}
                   >
                     <div
-                      className="h-1.5 w-1.5 rounded-full shrink-0"
+                      className="h-2 w-2 rounded-full shrink-0"
                       style={{ background: priority === p.value ? 'white' : p.color }}
                     />
                     {p.label}
@@ -543,13 +790,32 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
               </div>
             </div>
 
+            {/* Column / Status */}
+            {projectColumns.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Statut</p>
+                <select
+                  value={columnId}
+                  onChange={(e) => moveColumn.mutate(e.target.value)}
+                  disabled={moveColumn.isPending}
+                  className="w-full h-9 rounded-lg border border-border/70 bg-background px-2.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/30"
+                >
+                  {projectColumns.map((col) => (
+                    <option key={col.id} value={col.id}>
+                      {col.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Assignee */}
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Assigné à</p>
               <select
                 value={assigneeId}
                 onChange={(e) => setAssigneeId(e.target.value)}
-                className="w-full h-8 rounded-md border border-border/70 bg-background px-2 text-[12px]"
+                className="w-full h-9 rounded-lg border border-border/70 bg-background px-2.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-primary/30"
               >
                 <option value="">Non assigné</option>
                 {members.map((m) => (
@@ -558,25 +824,36 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
               </select>
             </div>
 
-            {/* Due date */}
-            <div className="space-y-1.5">
+            {/* Dates */}
+            <div className="space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Début</p>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="h-9 text-[12px] border-border/70"
+              />
+            </div>
+
+            <div className="space-y-2">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Échéance</p>
               <Input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="h-8 text-[12px] border-border/70"
+                className="h-9 text-[12px] border-border/70"
               />
             </div>
 
             {/* Time tracking */}
-            <div className="space-y-2.5 border-t border-border/40 pt-4">
+            <div className="space-y-3 border-t border-border/40 pt-5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <Clock className="h-3 w-3" />
-                Temps
+                Suivi du temps
               </p>
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground/60">Estimation (h)</p>
+
+              <div className="space-y-1.5">
+                <p className="text-[10px] text-muted-foreground/60">Estimation (heures)</p>
                 <Input
                   type="number"
                   min="0"
@@ -584,13 +861,15 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
                   value={estimatedHours}
                   onChange={(e) => setEstimatedHours(e.target.value)}
                   placeholder="ex: 2.5"
-                  className="h-7 text-[12px] border-border/60"
+                  className="h-8 text-[12px] border-border/60"
                 />
               </div>
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] text-muted-foreground/60">Logué</p>
-                <p className="text-[12px] font-medium text-foreground/80">{formatMinutes(loggedMin)}</p>
+
+              <div className="flex items-center justify-between px-0.5">
+                <p className="text-[10px] text-muted-foreground/60">Temps logué</p>
+                <p className="text-[13px] font-semibold text-foreground/80">{formatMinutes(loggedMin)}</p>
               </div>
+
               {detail?.time_entries && detail.time_entries.length > 0 && (
                 <div className="space-y-1 border-t border-border/30 pt-2">
                   {detail.time_entries.map((e) => (
@@ -604,8 +883,9 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
                   ))}
                 </div>
               )}
+
               {showLogTime ? (
-                <div className="space-y-1.5 border border-border/50 rounded-lg p-2.5">
+                <div className="space-y-1.5 border border-border/50 rounded-xl p-3 bg-background">
                   <Input
                     type="number"
                     min="0.1"
@@ -613,28 +893,28 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
                     value={logHours}
                     onChange={(e) => setLogHours(e.target.value)}
                     placeholder="Heures (ex: 1.5)"
-                    className="h-7 text-[12px] border-border/60"
+                    className="h-8 text-[12px] border-border/60"
                     autoFocus
                   />
                   <Input
                     value={logNote}
                     onChange={(e) => setLogNote(e.target.value)}
                     placeholder="Note (optionnel)"
-                    className="h-7 text-[12px] border-border/60"
+                    className="h-8 text-[12px] border-border/60"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && logHours) addTimeEntry.mutate()
                       if (e.key === 'Escape') setShowLogTime(false)
                     }}
                   />
-                  <div className="flex gap-1">
+                  <div className="flex gap-1.5">
                     <Button
-                      size="sm" className="h-6 text-[11px] flex-1"
+                      size="sm" className="h-7 text-[11px] flex-1"
                       disabled={!logHours || addTimeEntry.isPending}
                       onClick={() => addTimeEntry.mutate()}
                     >
                       Ajouter
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setShowLogTime(false)}>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setShowLogTime(false)}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
@@ -642,9 +922,9 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
               ) : (
                 <button
                   onClick={() => setShowLogTime(true)}
-                  className="w-full flex items-center gap-1.5 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors py-0.5"
+                  className="w-full flex items-center gap-2 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors py-1 px-0.5"
                 >
-                  <Timer className="h-3 w-3" />
+                  <Timer className="h-3.5 w-3.5" />
                   Ajouter du temps
                 </button>
               )}
@@ -652,16 +932,16 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
 
             {/* Reporter */}
             {task.reporter && (
-              <div className="space-y-1.5 border-t border-border/40 pt-4">
+              <div className="space-y-2 border-t border-border/40 pt-5">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Rapporteur</p>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   <Avatar name={task.reporter.full_name} size="xs" />
-                  <span className="text-[12px] text-muted-foreground">{task.reporter.first_name}</span>
+                  <span className="text-[12px] text-muted-foreground">{task.reporter.full_name}</span>
                 </div>
               </div>
             )}
 
-            <div className="pt-1 border-t border-border/40">
+            <div className="border-t border-border/40 pt-4">
               <p className="text-[10px] text-muted-foreground/40">
                 Créé le{' '}
                 {new Date(task.created_at).toLocaleDateString('fr-FR', {
@@ -669,26 +949,9 @@ export function TaskDialog({ task, projectId, open, onClose }: TaskDialogProps) 
                 })}
               </p>
             </div>
-
-            <div className="space-y-2">
-              <Button
-                onClick={() => update.mutate()}
-                disabled={update.isPending}
-                className="w-full text-[12px] h-8"
-              >
-                {update.isPending ? 'Enregistrement…' : 'Enregistrer'}
-              </Button>
-              <button
-                onClick={() => remove.mutate()}
-                className="w-full flex items-center justify-center gap-1.5 text-[12px] text-muted-foreground hover:text-destructive transition-colors py-1"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Supprimer
-              </button>
-            </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </>
   )
 }

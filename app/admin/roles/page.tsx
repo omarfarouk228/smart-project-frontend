@@ -68,21 +68,23 @@ export default function RolesPage() {
   }
 
   return (
-    <div className="p-8 space-y-5 max-w-3xl">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[20px] font-semibold tracking-tight">Rôles & permissions</h1>
+      <div className="px-6 py-4 border-b border-border/50 flex items-center gap-3 bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-[16px] font-semibold tracking-tight">Rôles &amp; permissions</h1>
           <p className="text-[12px] text-muted-foreground mt-0.5">
             {data?.total ?? '—'} rôle{(data?.total ?? 0) > 1 ? 's' : ''} configuré{(data?.total ?? 0) > 1 ? 's' : ''}
           </p>
         </div>
-        <Button onClick={() => setOpen(true)} className="text-[13px] h-8 gap-1.5">
+        <Button onClick={() => setOpen(true)} className="text-[13px] h-8 gap-1.5 shrink-0">
           <Plus className="h-3.5 w-3.5" />
           Nouveau rôle
         </Button>
       </div>
 
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-6">
       {/* Roles list */}
       <div className="space-y-2">
         {isLoading && <p className="text-[13px] text-muted-foreground py-8 text-center">Chargement…</p>}
@@ -157,6 +159,7 @@ export default function RolesPage() {
             </div>
           </div>
         ))}
+      </div>
       </div>
 
       {/* Create dialog */}

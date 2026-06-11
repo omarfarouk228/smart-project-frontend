@@ -24,15 +24,18 @@ export default function SprintsPage({ params }: { params: Promise<{ id: string }
   })
 
   return (
-    <div className="overflow-auto h-full">
-      <div className="p-6 space-y-4 max-w-2xl mx-auto">
-        <div>
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-border/50 flex items-center gap-3 bg-background/80 backdrop-blur-sm shrink-0">
+        <div className="flex-1 min-w-0">
           <h2 className="text-[16px] font-semibold tracking-tight">Sprints</h2>
           <p className="text-[12px] text-muted-foreground mt-0.5">
             {sprints?.length ?? 0} sprint{(sprints?.length ?? 0) > 1 ? 's' : ''} — créez-en depuis le Backlog
           </p>
         </div>
+      </div>
 
+      <div className="flex-1 overflow-y-auto p-6 space-y-3">
         {isLoading && <p className="text-[13px] text-muted-foreground py-8 text-center">Chargement…</p>}
 
         {!isLoading && sprints?.length === 0 && (
@@ -101,3 +104,4 @@ export default function SprintsPage({ params }: { params: Promise<{ id: string }
     </div>
   )
 }
+

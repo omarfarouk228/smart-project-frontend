@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { ShieldCheck } from 'lucide-react'
+import { ShieldCheck, Eye, EyeOff } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/lib/api'
 import { Input } from '@/components/ui/input'
@@ -29,6 +29,9 @@ export default function ChangePasswordPage() {
   const router = useRouter()
   const setUser = useAuthStore((s) => s.setUser)
   const [loading, setLoading] = useState(false)
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -69,36 +72,66 @@ export default function ChangePasswordPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
               <Label className="text-[12px] font-medium text-foreground/70">Mot de passe temporaire</Label>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                className="h-9 text-[13px] bg-background border-border/70"
-                {...register('current_password')}
-              />
+              <div className="relative">
+                <Input
+                  type={showCurrent ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  className="h-9 text-[13px] bg-background border-border/70 pr-9"
+                  {...register('current_password')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrent((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {errors.current_password && (
                 <p className="text-[11px] text-destructive">{errors.current_password.message}</p>
               )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-[12px] font-medium text-foreground/70">Nouveau mot de passe</Label>
-              <Input
-                type="password"
-                placeholder="Minimum 8 caractères"
-                className="h-9 text-[13px] bg-background border-border/70"
-                {...register('new_password')}
-              />
+              <div className="relative">
+                <Input
+                  type={showNew ? 'text' : 'password'}
+                  placeholder="Minimum 8 caractères"
+                  className="h-9 text-[13px] bg-background border-border/70 pr-9"
+                  {...register('new_password')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNew((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {errors.new_password && (
                 <p className="text-[11px] text-destructive">{errors.new_password.message}</p>
               )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-[12px] font-medium text-foreground/70">Confirmer</Label>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                className="h-9 text-[13px] bg-background border-border/70"
-                {...register('confirm_password')}
-              />
+              <div className="relative">
+                <Input
+                  type={showConfirm ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  className="h-9 text-[13px] bg-background border-border/70 pr-9"
+                  {...register('confirm_password')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {errors.confirm_password && (
                 <p className="text-[11px] text-destructive">{errors.confirm_password.message}</p>
               )}

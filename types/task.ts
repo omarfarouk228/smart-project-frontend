@@ -39,6 +39,17 @@ export interface TimeEntry {
   logged_at: string
 }
 
+export interface Attachment {
+  id: string
+  task_id: string
+  uploader: UserBasic
+  filename: string
+  file_path: string
+  file_size: number
+  mime_type: string
+  created_at: string
+}
+
 export interface Task {
   id: string
   project_id: string
@@ -57,6 +68,7 @@ export interface Task {
   subtask_count: number
   subtask_done_count: number
   comment_count: number
+  attachment_count: number
   created_at: string
   updated_at: string
 }
@@ -65,4 +77,5 @@ export interface TaskDetail extends Task {
   subtasks: SubTask[]
   comments: Comment[]
   time_entries: TimeEntry[]
+  attachments: Attachment[]
 }

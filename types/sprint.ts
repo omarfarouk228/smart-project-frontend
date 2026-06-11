@@ -14,9 +14,13 @@ export interface Sprint {
   created_at: string
 }
 
+export interface SprintWithTasks extends Sprint {
+  tasks: Task[]
+}
+
 export interface BacklogResponse {
   tasks: Task[]
-  sprints: Sprint[]
+  sprints: SprintWithTasks[]
 }
 
 export interface SprintBoardResponse {

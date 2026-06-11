@@ -60,32 +60,36 @@ export default function UsersPage() {
   })
 
   return (
-    <div className="p-8 space-y-5 max-w-5xl">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[20px] font-semibold tracking-tight">Membres</h1>
+      <div className="px-6 py-4 border-b border-border/50 flex items-center gap-3 bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-[16px] font-semibold tracking-tight">Membres</h1>
           <p className="text-[12px] text-muted-foreground mt-0.5">
             {data?.total ?? '—'} membre{(data?.total ?? 0) > 1 ? 's' : ''} dans l&apos;organisation
           </p>
         </div>
-        <Link href="/admin/users/new" className={cn(buttonVariants(), 'text-[13px] h-8 gap-1.5')}>
+        <Link href="/admin/users/new" className={cn(buttonVariants(), 'text-[13px] h-8 gap-1.5 shrink-0')}>
           <Plus className="h-3.5 w-3.5" />
           Inviter un membre
         </Link>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-[280px]">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
-        <Input
-          placeholder="Rechercher un membre…"
-          className="h-8 pl-8 text-[13px] bg-card border-border/60 placeholder:text-muted-foreground/40"
-          value={search}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); setPage(1) }}
-        />
+      {/* Toolbar */}
+      <div className="px-6 py-3 border-b border-border/40">
+        <div className="relative w-64">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
+          <Input
+            placeholder="Rechercher un membre…"
+            className="h-8 pl-8 text-[12px] bg-muted/30 border-border/50 placeholder:text-muted-foreground/40"
+            value={search}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); setPage(1) }}
+          />
+        </div>
       </div>
 
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-6">
       {/* Table */}
       <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
         <table className="w-full">
@@ -203,7 +207,7 @@ export default function UsersPage() {
 
       {/* Pagination */}
       {data && data.total > 20 && (
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-2 mt-4">
           <Button variant="outline" size="sm" className="h-7 text-[12px]" onClick={() => setPage((p) => p - 1)} disabled={page === 1}>
             Précédent
           </Button>
@@ -215,6 +219,7 @@ export default function UsersPage() {
           </Button>
         </div>
       )}
+      </div>
     </div>
   )
 }

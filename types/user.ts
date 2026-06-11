@@ -13,6 +13,7 @@ export interface User {
   last_login: string | null
   created_at: string
   roles: RoleBasic[]
+  permissions: string[]
 }
 
 export interface UserListResponse {
