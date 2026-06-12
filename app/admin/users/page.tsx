@@ -4,16 +4,19 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, Search, MoreHorizontal, RotateCcw, Power, UserCheck } from 'lucide-react'
+import { Plus, Search, MoreHorizontal, RotateCcw, Power, UserCheck, ShieldCheck, Pencil, Trash2 } from 'lucide-react'
 import api from '@/lib/api'
-import type { UserListResponse } from '@/types/user'
+import type { UserListResponse, User } from '@/types/user'
+import type { RoleListResponse } from '@/types/role'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog'
 
 function UserAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
   const initials = name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
@@ -33,10 +36,224 @@ function UserAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' })
   )
 }
 
+function RoleEditDialog({
+  user,
+  onClose,
+}: {
+  user: User
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const { data: rolesData } = useQuery<RoleListResponse>({
+    queryKey: ['roles'],
+    queryFn: async () => (await api.get('/api/roles')).data,
+  })
+
+  const [selectedIds, setSelectedIds] = useState<string[]>(user.roles.map((r) => r.id))
+
+  const save = useMutation({
+    mutationFn: () => api.patch(`/api/users/${user.id}`, { role_ids: selectedIds }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] })
+      toast.success('Rôles mis à jour')
+      onClose()
+    },
+    onError: () => toast.error('Erreur lors de la mise à jour des rôles'),
+  })
+
+  const toggle = (id: string) =>
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Modifier les rôles</DialogTitle>
+          <p className="text-[12px] text-muted-foreground">{user.full_name}</p>
+        </DialogHeader>
+
+        <div className="flex flex-wrap gap-2 py-1">
+          {rolesData?.items.map((role) => {
+            const active = selectedIds.includes(role.id)
+            return (
+              <button
+                key={role.id}
+                type="button"
+                onClick={() => toggle(role.id)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-full border transition-all',
+                  active
+                    ? 'border-transparent text-white'
+                    : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted',
+                )}
+                style={active ? { background: role.color, borderColor: role.color } : {}}
+              >
+                {active && <span className="h-1.5 w-1.5 rounded-full bg-white/70" />}
+                {role.name}
+              </button>
+            )
+          })}
+          {!rolesData && (
+            <p className="text-[12px] text-muted-foreground">Chargement…</p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" size="sm" className="text-[12px]" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button size="sm" className="text-[12px]" onClick={() => save.mutate()} disabled={save.isPending}>
+            {save.isPending ? 'Enregistrement…' : 'Enregistrer'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function EditUserDialog({
+  user,
+  onClose,
+}: {
+  user: User
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const [firstName, setFirstName] = useState(user.first_name)
+  const [lastName, setLastName] = useState(user.last_name)
+  const [email, setEmail] = useState(user.email)
+
+  const save = useMutation({
+    mutationFn: () => api.patch(`/api/users/${user.id}`, { first_name: firstName, last_name: lastName, email }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] })
+      toast.success('Compte mis à jour')
+      onClose()
+    },
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail
+      toast.error(typeof detail === 'string' ? detail : 'Erreur lors de la mise à jour')
+    },
+  })
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Modifier le compte</DialogTitle>
+          <p className="text-[12px] text-muted-foreground">{user.email}</p>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-medium text-muted-foreground">Prénom</label>
+              <Input
+                value={firstName}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFirstName(e.target.value)}
+                className="h-8 text-[13px]"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-medium text-muted-foreground">Nom</label>
+              <Input
+                value={lastName}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLastName(e.target.value)}
+                className="h-8 text-[13px]"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium text-muted-foreground">Email</label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+              className="h-8 text-[13px]"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" size="sm" className="text-[12px]" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button
+            size="sm"
+            className="text-[12px]"
+            onClick={() => save.mutate()}
+            disabled={save.isPending || !firstName.trim() || !lastName.trim() || !email.trim()}
+          >
+            {save.isPending ? 'Enregistrement…' : 'Enregistrer'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DeleteUserDialog({
+  user,
+  onClose,
+}: {
+  user: User
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+
+  const del = useMutation({
+    mutationFn: () => api.delete(`/api/users/${user.id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] })
+      toast.success('Compte supprimé')
+      onClose()
+    },
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail
+      toast.error(typeof detail === 'string' ? detail : 'Erreur lors de la suppression')
+    },
+  })
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Supprimer le compte</DialogTitle>
+        </DialogHeader>
+
+        <p className="text-[13px] text-muted-foreground">
+          Supprimer définitivement le compte de{' '}
+          <span className="font-medium text-foreground">{user.full_name}</span> ?
+          Cette action est irréversible.
+        </p>
+
+        <DialogFooter>
+          <Button variant="outline" size="sm" className="text-[12px]" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="text-[12px]"
+            onClick={() => del.mutate()}
+            disabled={del.isPending}
+          >
+            {del.isPending ? 'Suppression…' : 'Supprimer'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export default function UsersPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const qc = useQueryClient()
+
+  const [roleEditUser, setRoleEditUser] = useState<User | null>(null)
+  const [editUser, setEditUser] = useState<User | null>(null)
+  const [deleteUser, setDeleteUser] = useState<User | null>(null)
 
   const { data, isLoading } = useQuery<UserListResponse>({
     queryKey: ['users', page, search],
@@ -61,6 +278,10 @@ export default function UsersPage() {
 
   return (
     <div className="flex flex-col h-full">
+      {roleEditUser && <RoleEditDialog user={roleEditUser} onClose={() => setRoleEditUser(null)} />}
+      {editUser && <EditUserDialog user={editUser} onClose={() => setEditUser(null)} />}
+      {deleteUser && <DeleteUserDialog user={deleteUser} onClose={() => setDeleteUser(null)} />}
+
       {/* Header */}
       <div className="px-6 py-4 border-b border-border/50 flex items-center gap-3 bg-background/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="flex-1 min-w-0">
@@ -180,7 +401,21 @@ export default function UsersPage() {
                         <MoreHorizontal className="h-3.5 w-3.5" />
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48 text-[13px]">
+                    <DropdownMenuContent align="end" className="w-52 text-[13px]">
+                      <DropdownMenuItem
+                        onClick={() => setEditUser(user)}
+                        className="gap-2 cursor-pointer"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Modifier le compte
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setRoleEditUser(user)}
+                        className="gap-2 cursor-pointer"
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        Modifier les rôles
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => resetPwd.mutate(user.id)}
                         className="gap-2 cursor-pointer"
@@ -191,11 +426,23 @@ export default function UsersPage() {
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => toggleActive.mutate({ id: user.id, is_active: !user.is_active })}
-                        className={cn('gap-2 cursor-pointer', user.is_active && 'text-destructive')}
+                        className={cn('gap-2 cursor-pointer', user.is_active && 'text-amber-600')}
                       >
                         <Power className="h-3.5 w-3.5" />
                         {user.is_active ? 'Désactiver' : 'Réactiver'}
                       </DropdownMenuItem>
+                      {!user.is_superadmin && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setDeleteUser(user)}
+                            className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Supprimer le compte
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </td>
