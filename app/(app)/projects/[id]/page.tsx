@@ -13,12 +13,13 @@ import {
   SortableContext, verticalListSortingStrategy, arrayMove,
 } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
-import { Plus } from 'lucide-react'
+import { Plus, Upload } from 'lucide-react'
 import api from '@/lib/api'
 import type { BoardResponse, Column } from '@/types/project'
 import type { Task } from '@/types/task'
 import { TaskCard } from '@/components/kanban/TaskCard'
 import { TaskDialog } from '@/components/kanban/TaskDialog'
+import { ImportTasksDialog } from '@/components/kanban/ImportTasksDialog'
 import { useProjectSocket } from '@/hooks/useProjectSocket'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -84,6 +85,7 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
   const [addingToColumn, setAddingToColumn] = useState<string | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [overId, setOverId] = useState<string | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
 
   useProjectSocket(projectId)
 
@@ -215,6 +217,18 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
     <div className="flex flex-col h-full">
       {/* Board */}
       <div className="flex-1 overflow-auto p-6">
+        <div className="flex justify-end mb-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-[12px]"
+            onClick={() => setImportOpen(true)}
+          >
+            <Upload className="h-3.5 w-3.5" />
+            Importer
+          </Button>
+        </div>
+
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -288,6 +302,15 @@ export default function ProjectBoardPage({ params }: { params: Promise<{ id: str
           setDialogOpen(false)
           setSelectedTask(null)
         }}
+      />
+
+      {/* Import tasks dialog */}
+      <ImportTasksDialog
+        projectId={projectId}
+        columns={board.columns}
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => qc.invalidateQueries({ queryKey: ['board', projectId] })}
       />
     </div>
   )
